@@ -1,0 +1,62 @@
+﻿BASIC RULES
+
+Build a hand with a higher value than the house without going over 21.
+Aces may count as either 11 or 1. 
+Face cards are worht 10.
+Other cards are worth the number they show.
+
+
+START
+
+Place a bet and deal.
+
+
+HIT
+
+Use this option when you would like to request another card.
+You may hit as many times as you like, 
+but if you go over 21 you lose.
+
+
+STAND
+
+When you are done requesting cards, you may stand 
+and let the house take their turn.
+
+
+SPLIT
+
+If a hand has 2 cards of the same value, you may double your bet
+and split them into two separate hands. 
+Each hand will then be played individually.
+
+
+DOUBLE DOWN
+
+If a hand has 2 cards, you may double your bet,
+and receive ONE more card for your hand.
+
+
+BLACK JACK
+
+Any hand containing an Ace and a face card is called a black jack.
+Black jack beats every other hand, and pays 3 to 2 for the player.
+
+
+PUSH 
+
+If a player's hand has the same value as the house, it is a push.
+The player receives their original bet back.
+
+
+BUST
+
+A player is said to bust when their hand is worth more than 21.
+
+
+INSURANCE
+
+Insurance is offered if the dealer is showing an Ace after the initial deal.
+Insurance costs half of your initial bet.
+If the dealer has black jack, it pays 2 to 1.
+If the dealer doesn't have black jack the insurance bet is lost.
