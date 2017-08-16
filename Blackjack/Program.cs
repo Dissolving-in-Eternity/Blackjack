@@ -4,8 +4,10 @@
     {
         static void Main(string[] args)
         {
-            var deck = new Deck();
-            deck.Shuffle();
+            Blackjack bj = new Blackjack(5000);
+            bj.CurrentBet = 500;
+            bj.Deal();
+            bj.CardsCheck();
         }
     }
 }
