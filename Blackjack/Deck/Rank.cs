@@ -1,4 +1,4 @@
-﻿namespace Blackjack
+﻿namespace Blackjack.Deck
 {
     public enum Rank
     {

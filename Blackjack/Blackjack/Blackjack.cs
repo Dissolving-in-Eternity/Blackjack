@@ -1,22 +1,24 @@
-﻿using System;
+﻿using Blackjack.Deck;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Blackjack
+namespace Blackjack.Blackjack
 {
     public class Blackjack
     {
         // Игрок
-        public List<Card> Hand { get; private set; }
+        public List<Hand> Hands { get; set; }
 
         // Крупье
-        public List<Card> House { get; private set; }
+        public House House { get; set; }
 
         // Деньги для ставок
         public decimal Money { get; private set; }
 
         // Ставка в текущем раунде
         private decimal _currentBet;
+
         public decimal CurrentBet
         {
             get { return _currentBet; }
@@ -31,7 +33,7 @@ namespace Blackjack
             }
         }
 
-        public Deck Cards { get; private set; }
+        public Deck.Deck Cards { get; private set; }
 
         public List<Card> FaceCards { get; private set; }
 
@@ -41,18 +43,18 @@ namespace Blackjack
 
         public Blackjack(decimal startMoney)
         {
-            Cards = new Deck();
+            Cards = new Deck.Deck();
             FaceCards = new List<Card>();
             CardValues = new Dictionary<Card, byte>();
             Money = startMoney;
 
             AddCard(Cards);
 
-            Hand = new List<Card>();
-            House = new List<Card>();
+            Hands = new List<Hand> {new Hand()};
+            House = House.GetHouse;
         }
 
-        private void AddCard(Deck cards)
+        private void AddCard(Deck.Deck cards)
         {
             foreach (var card in cards.DeckOfCards)
             {
@@ -111,30 +113,57 @@ namespace Blackjack
 
         #endregion
 
-        public void Deal()
+        public void Deal(bool isFirstDeal, int handIndex = 0)
         {
+            int cardsToDeal = isFirstDeal ? 2 : 1;
+
             // Перемешиваем карты
             Cards.Shuffle();
 
-            // Раздаём по 2 карты на руки игроку и крупье,
+            // Раздаём по 1\2 карты на руки игроку и крупье,
             // TODO: При чём у крупье отображаем только одну из двух карт
-            //Hand.Add(Cards.DeckOfCards.First(c => c.Rank == Rank.Ace));
-            Hand.AddRange(Cards.DeckOfCards.Take(2));
-            Cards.DeckOfCards.RemoveRange(0, 2);
+            Hands.ElementAt(handIndex).HandCards
+                .AddRange(Cards.DeckOfCards.Take(cardsToDeal));
+            Cards.DeckOfCards.RemoveRange(0, cardsToDeal);
 
-            House.AddRange(Cards.DeckOfCards.Take(2));
-            Cards.DeckOfCards.RemoveRange(0, 2);
+            House.HouseCards.AddRange(Cards.DeckOfCards.Take(cardsToDeal));
+            Cards.DeckOfCards.RemoveRange(0, cardsToDeal);
+
+            CalculateValues(handIndex);
         }
 
-        public void CardsCheck()
+        private void CalculateValues(int handIndex)
         {
-            // Только в случае 2-х карт проверяем на блекджек
-            if (Hand.Count == 2 || House.Count == 2)
+            Hands.ElementAt(handIndex).Value =
+                CalculateCurrentValue(Hands.ElementAt(handIndex).HandCards);
+
+            House.HouseValue = CalculateCurrentValue(House.HouseCards);
+        }
+
+        private byte CalculateCurrentValue(List<Card> cards)
+        {
+            byte value = 0;
+
+            foreach (var card in cards)
             {
-                bool handBlackjack = BlackjackCheck(Hand);
+                if (CardValues.ContainsKey(card))
+                    value += CardValues[card];
+            }
+
+            return value;
+        }
+
+        public void CardsCheck(int handIndex = 0)
+        {
+            var currentHandCards = Hands.ElementAt(handIndex).HandCards;
+
+            // Только в случае 2-х карт проверяем на блекджек
+            if (currentHandCards.Count == 2 || House.HouseCards.Count == 2)
+            {
+                bool handBlackjack = BlackjackCheck(currentHandCards);
 
                 // Ничья
-                if (handBlackjack && BlackjackCheck(House))
+                if (handBlackjack && BlackjackCheck(House.HouseCards))
                     Push();
                 else if (handBlackjack)
                     BlackJackInit();
@@ -152,7 +181,8 @@ namespace Blackjack
             return false;
         }
 
-        private void BlackJackInit() => Money += CurrentBet * 1.5m;
+        // 3 to 2
+        private void BlackJackInit() => Money += CurrentBet * 2.5m;
 
         private void Push() => Money += CurrentBet;
 

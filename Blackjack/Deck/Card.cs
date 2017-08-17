@@ -1,4 +1,4 @@
-﻿namespace Blackjack
+﻿namespace Blackjack.Deck
 {
     public class Card
     {

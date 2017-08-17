@@ -42,19 +42,22 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Blackjack.cs" />
-    <Compile Include="Card.cs" />
-    <Compile Include="Deck.cs" />
+    <Compile Include="Blackjack\Blackjack.cs" />
+    <Compile Include="Deck\Card.cs" />
+    <Compile Include="Deck\Deck.cs" />
+    <Compile Include="Blackjack\Hand.cs" />
+    <Compile Include="Blackjack\House.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Rank.cs" />
-    <Compile Include="Suit.cs" />
+    <Compile Include="Deck\Rank.cs" />
+    <Compile Include="Deck\Suit.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Rules.txt" />
+    <Content Include="Blackjack\Rules.txt" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

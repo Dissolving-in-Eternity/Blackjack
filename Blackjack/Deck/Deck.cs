@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Blackjack
+namespace Blackjack.Deck
 {
     public class Deck
     {
