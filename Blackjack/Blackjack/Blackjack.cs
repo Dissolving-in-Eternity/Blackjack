@@ -7,6 +7,8 @@ namespace Blackjack.Blackjack
 {
     public class Blackjack
     {
+        #region Members
+
         // Игрок
         public List<Hand> Hands { get; set; }
 
@@ -33,11 +35,14 @@ namespace Blackjack.Blackjack
             }
         }
 
+        // Колода, используемая в игре
         public Deck.Deck Cards { get; private set; }
 
         public List<Card> FaceCards { get; private set; }
 
         public Dictionary<Card, byte> CardValues { get; private set; }
+
+        #endregion
 
         #region Init
 
@@ -113,32 +118,46 @@ namespace Blackjack.Blackjack
 
         #endregion
 
-        public void Deal(bool isFirstDeal, int handIndex = 0)
-        {
-            int cardsToDeal = isFirstDeal ? 2 : 1;
+        #region Deal
 
+        public void FirstDeal(int handIndex = 0)
+        {
             // Перемешиваем карты
             Cards.Shuffle();
 
-            // Раздаём по 1\2 карты на руки игроку и крупье,
-            // TODO: При чём у крупье отображаем только одну из двух карт
+            DealUserCards(2, handIndex);
+            DealHouseCards(2);
+        }
+
+        private void DealHouseCards(int cardsToDeal)
+        {
+            House.HouseCards.AddRange(Cards.DeckOfCards.Take(cardsToDeal));
+            Cards.DeckOfCards.RemoveRange(0, cardsToDeal);
+
+            CalculateHouseValues();
+        }
+
+        private void DealUserCards(int cardsToDeal, int handIndex = 0)
+        {
             Hands.ElementAt(handIndex).HandCards
                 .AddRange(Cards.DeckOfCards.Take(cardsToDeal));
             Cards.DeckOfCards.RemoveRange(0, cardsToDeal);
 
-            House.HouseCards.AddRange(Cards.DeckOfCards.Take(cardsToDeal));
-            Cards.DeckOfCards.RemoveRange(0, cardsToDeal);
-
-            CalculateValues(handIndex);
+            CalculateHandValues(handIndex);
         }
 
-        private void CalculateValues(int handIndex)
+        #endregion
+
+        #region Figure Out Values
+
+        private void CalculateHandValues(int handIndex)
         {
             Hands.ElementAt(handIndex).Value =
                 CalculateCurrentValue(Hands.ElementAt(handIndex).HandCards);
-
-            House.HouseValue = CalculateCurrentValue(House.HouseCards);
         }
+
+        private void CalculateHouseValues() =>
+            House.HouseValue = CalculateCurrentValue(House.HouseCards);
 
         private byte CalculateCurrentValue(List<Card> cards)
         {
@@ -153,20 +172,29 @@ namespace Blackjack.Blackjack
             return value;
         }
 
-        public void CardsCheck(int handIndex = 0)
+        #endregion
+
+        #region Checks
+
+        public void CheckCards(int handIndex = 0)
         {
             var currentHandCards = Hands.ElementAt(handIndex).HandCards;
 
-            // Только в случае 2-х карт проверяем на блекджек
-            if (currentHandCards.Count == 2 || House.HouseCards.Count == 2)
+            // Blackjack check: 
+            // 1. After 1st Deal (Ok)
+            // TODO: 2. After Split && 1st Deal in a new Hand
+            if (currentHandCards.Count == 2 && House.HouseCards.Count == 2)
             {
                 bool handBlackjack = BlackjackCheck(currentHandCards);
+                bool houseBlackjack = BlackjackCheck(House.HouseCards);
 
                 // Ничья
-                if (handBlackjack && BlackjackCheck(House.HouseCards))
+                if (handBlackjack && houseBlackjack)
                     Push();
                 else if (handBlackjack)
                     BlackJackInit();
+                else if (houseBlackjack)
+                    Lose();
             }
 
             // TODO: Если отображаемая карта у крупье - туз, предлагаем страховку
@@ -181,20 +209,67 @@ namespace Blackjack.Blackjack
             return false;
         }
 
-        // 3 to 2
-        private void BlackJackInit() => Money += CurrentBet * 2.5m;
+        public void CheckValues(int handIndex = 0)
+        {
+            var currenHandValue = Hands.ElementAt(handIndex).Value;
+            var currenHouseValue = House.HouseValue;
+
+            if (currenHandValue > 21 && currenHouseValue > 21)
+                Push();
+            else if (currenHandValue > 21)
+                Bust();
+            else if (currenHouseValue > 21)
+                Win();
+            else if(currenHandValue == currenHouseValue)
+                Push();
+            else if(currenHandValue > currenHouseValue)
+                Win();
+            else if(currenHouseValue > currenHandValue)
+                Lose();
+        }
+
+        #endregion
+
+        #region User Actions
+
+        public void Hit()
+        {
+            DealUserCards(1);
+
+            if(Hands.ElementAt(0).Value > 21)
+                Bust();
+        }
+
+        public void Stand()
+        {
+            // Раздаём по 1 карте для House до тех пор, пока House Value не достигнет 17
+            while (House.HouseValue < 17)
+                DealHouseCards(1);
+        }
+
+        // TODO: Double Down
+
+        // TODO: Split
+
+        #endregion
+
+        #region Actions/Outcomes
+
+        private void Bust() => CurrentBet = 0;
 
         private void Push() => Money += CurrentBet;
 
-        public void UserAction()
+        private void Win()
         {
-            // TODO: Hit 
-
-            // TODO: Stand
-
-            // TODO: Double Down
-
-            // TODO: Если value карт равно, возможность Split'а
+            Money += CurrentBet * 2;
+            CurrentBet = 0;
         }
+
+        private void Lose() => CurrentBet = 0;
+
+        // 3 to 2
+        private void BlackJackInit() => Money += CurrentBet * 2.5m;
+
+        #endregion
     }
 }
