@@ -11,21 +11,22 @@ namespace Blackjack
 
             bj.FirstDeal();
 
-            bj.CheckCards();
+            bj.BlackjackCheckInit();
 
             var handValue = bj.Hands.ElementAt(0).Value;
+            var handAltValue = bj.Hands.ElementAt(0).AlternativeValue;
 
-            if(handValue < 17)
-                while (handValue < 17)
-                {
-                    bj.Hit();
+            while (handValue < 17 || handAltValue != null && handAltValue < 18)
+            {
+                bj.Hit();
 
-                    handValue = bj.Hands.ElementAt(0).Value;
-                }
-            else
-                bj.Stand();
+                handValue = bj.Hands.ElementAt(0).Value;
+                handAltValue = bj.Hands.ElementAt(0).AlternativeValue;
+            }
 
-            bj.CheckValues();
+            bj.Stand();
+
+            bj.CheckValues(true);
         }
     }
 }

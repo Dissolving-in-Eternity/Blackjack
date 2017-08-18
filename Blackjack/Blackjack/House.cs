@@ -7,10 +7,18 @@ namespace Blackjack.Blackjack
     public class House
     {
         public List<Card> HouseCards { get; private set; }
-        public byte HouseValue { get; set; }
+
+        public byte Value { get; set; }
+
+        public byte? AlternativeValue { get; set; }
 
         private static House house;
-        private House() { HouseCards = new List<Card>(); }
+
+        private House()
+        {
+            HouseCards = new List<Card>();
+            AlternativeValue = 0;
+        }
 
         public static House GetHouse
         {

@@ -11,9 +11,13 @@ namespace Blackjack.Blackjack
         // Сколько очков набрано
         public byte Value { get; set; }
 
+        // На случай тузов
+        public byte? AlternativeValue { get; set; }
+
         public Hand()
         {
             HandCards = new List<Card>();
+            AlternativeValue = 0;
         }
     }
 }
