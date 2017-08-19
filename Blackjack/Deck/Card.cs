@@ -10,5 +10,10 @@
             Suit = suit;
             Rank = rank;
         }
+
+        public override string ToString()
+        {
+            return string.Format($"{ Rank } of {Suit}");
+        }
     }
 }

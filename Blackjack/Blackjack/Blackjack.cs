@@ -5,6 +5,12 @@ using System.Linq;
 
 namespace Blackjack.Blackjack
 {
+    public delegate void BustHandler(string s, decimal m);
+    public delegate void PushHandler(string s, decimal m);
+    public delegate void WinHandler(string s, decimal m);
+    public delegate void LoseHandler(string s, decimal m);
+    public delegate void BlackjackHandler(string s, decimal m);
+
     public class Blackjack
     {
         #region Members
@@ -23,11 +29,14 @@ namespace Blackjack.Blackjack
 
         public decimal CurrentBet
         {
-            get { return _currentBet; }
+            get => _currentBet;
             set
             {
                 if (value > Money)
-                    throw new ArgumentException("Not enough money", nameof(value));
+                    throw new ArgumentException("Not enough money.");
+
+                if(value < 0)
+                    throw new ArgumentOutOfRangeException(null, "Bet can't be less than 0");
 
                 _currentBet = value;
 
@@ -41,6 +50,12 @@ namespace Blackjack.Blackjack
         public List<Card> FaceCards { get; private set; }
 
         public Dictionary<Card, byte> CardValues { get; private set; }
+
+        public event BustHandler BustEvent;
+        public event PushHandler PushEvent;
+        public event WinHandler WinEvent;
+        public event LoseHandler LoseEvent;
+        public event BlackjackHandler BlackjackEvent;
 
         #endregion
 
@@ -129,7 +144,7 @@ namespace Blackjack.Blackjack
             DealHouseCards(2);
         }
 
-        private void DealHouseCards(int cardsToDeal)
+        public void DealHouseCards(int cardsToDeal)
         {
             House.HouseCards.AddRange(Cards.DeckOfCards.Take(cardsToDeal));
             Cards.DeckOfCards.RemoveRange(0, cardsToDeal);
@@ -142,7 +157,7 @@ namespace Blackjack.Blackjack
                 CheckValues();
         }
 
-        private void DealUserCards(int cardsToDeal, int handIndex = 0)
+        public void DealUserCards(int cardsToDeal, int handIndex = 0)
         {
             Hands.ElementAt(handIndex).HandCards
                 .AddRange(Cards.DeckOfCards.Take(cardsToDeal));
@@ -180,12 +195,18 @@ namespace Blackjack.Blackjack
         private byte CalculateCurrentValue(List<Card> cards, ref byte? altValue)
         {
             byte value = 0;
+            bool isFirstDeal = cards.Count == 2;
 
             // На случай 2-х тузов после 1-й раздачи
-            if (cards.Count == 2 && cards.All(c => c.Rank == Rank.Ace))
+            if (isFirstDeal && cards.All(c => c.Rank == Rank.Ace))
             {
                 value = 2;
                 altValue = 12;
+            }
+            else if (isFirstDeal && BlackjackCheck(cards))
+            {
+                value = 21;
+                altValue = null;
             }
             else
             {
@@ -224,11 +245,17 @@ namespace Blackjack.Blackjack
 
                 // Ничья
                 if (handBlackjack && houseBlackjack)
+                {
+                    PushEvent?.Invoke("Push just happened! You and House both have blackjack! \n\n+", CurrentBet);
                     Push();
+                }
                 else if (handBlackjack)
                     BlackJackInit();
                 else if (houseBlackjack)
+                {
+                    LoseEvent?.Invoke("House has blackjack! You lose. \n\n-", CurrentBet);
                     Lose();
+                }
             }
         }
 
@@ -250,31 +277,56 @@ namespace Blackjack.Blackjack
             var houseAltValue = House.AlternativeValue;
             
             // Проверка на Bust (после каждой раздачи) 
-            if (handValue > 21 && houseValue > 21)
-                Push();
-            else if (handValue > 21)
-                Bust();
-            else if (houseValue > 21)
-                Win();
+            BustCheck(handValue, houseValue);
 
-            if (isFinalCheck)
+            if(isFinalCheck)
+                FinalCheck(handAltValue, handValue, houseAltValue, houseValue);
+        }
+
+        private void FinalCheck(byte? handAltValue, byte handValue, byte? houseAltValue, byte houseValue)
+        {
+            var finalHandlValue = handAltValue != null && handAltValue > handValue
+                ? handAltValue
+                : handValue;
+
+            var finalHouseValue = houseAltValue != null && houseAltValue > houseValue
+                ? houseAltValue
+                : houseValue;
+
+            if (finalHandlValue == finalHouseValue)
             {
-                var finalHandlValue = handAltValue != null && handAltValue > handValue
-                    ? handAltValue
-                    : handValue;
-
-                var finalHouseValue = houseAltValue != null && houseAltValue > houseValue
-                    ? houseAltValue
-                    : houseValue;
-
-                if (finalHandlValue == finalHouseValue)
-                    Push();
-                else if (finalHandlValue > finalHouseValue)
-                    Win();
-                else if (finalHandlValue < finalHouseValue)
-                    Lose();
+                PushEvent?.Invoke("Push just happened! You have the same value as the house. \n\n+", CurrentBet);
+                Push();
             }
-            
+            else if (finalHandlValue > finalHouseValue)
+            {
+                WinEvent?.Invoke("You have more points than the House. You won! \n\n+", CurrentBet * 2);
+                Win();
+            }
+            else if (finalHandlValue < finalHouseValue)
+            {
+                LoseEvent?.Invoke("House has more points than you. You lose. \n\n-", CurrentBet);
+                Lose();
+            }
+        }
+
+        private void BustCheck(byte handValue, byte houseValue)
+        {
+            if (handValue > 21 && houseValue > 21)
+            {
+                PushEvent?.Invoke("Push just happened! You and House both busted. \n\n+", CurrentBet);
+                Push();
+            }
+            else if (handValue > 21)
+            {
+                BustEvent?.Invoke("Bust just happened! Hand is worth more than 21. \n\n-", CurrentBet);
+                Bust();
+            }
+            else if (houseValue > 21)
+            {
+                WinEvent?.Invoke("House has more than 21. You win! \n\n+", CurrentBet * 2);
+                Win();
+            }
         }
 
         #endregion
@@ -321,7 +373,11 @@ namespace Blackjack.Blackjack
 
         private void Bust() => CurrentBet = 0;
 
-        private void Push() => Money += CurrentBet;
+        private void Push()
+        {
+            Money += CurrentBet;
+            CurrentBet = 0;
+        }
 
         private void Win()
         {
@@ -332,7 +388,14 @@ namespace Blackjack.Blackjack
         private void Lose() => CurrentBet = 0;
 
         // 3 to 2
-        private void BlackJackInit() => Money += CurrentBet * 2.5m;
+        private void BlackJackInit()
+        {
+            var gain = CurrentBet * 2.5m;
+            Money += gain;
+            CurrentBet = 0;
+
+            BlackjackEvent?.Invoke("Congratulations! You have blackjack! \n\n+", gain);
+        }
 
         #endregion
     }
