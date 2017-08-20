@@ -1,4 +1,5 @@
-﻿using Blackjack.Deck;
+﻿using Blackjack.Blackjack;
+using Blackjack.Deck;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -8,28 +9,46 @@ namespace Blackjack
 {
     internal static class Program
     {
+        private static bool isRoundFinished;
+
         private static void Main(string[] args)
         {
-            var bj = new Blackjack.Blackjack(5000);
+            var bj = new Blackjack.Blackjack(500);
 
-            SubscribeToEvents(bj);
+            WriteLine("Welcome to the Blackjack by Pride!");
 
-            WriteLine("Welcome to the Blackjack by Pride!\n");
-            WriteLine($"Your current amount of money is { bj.Money }.\n");
+            do
+            {
+                if (isRoundFinished)
+                {
+                    var moneyFromTheLastRound = bj.Money;
+                    bj = new Blackjack.Blackjack(moneyFromTheLastRound);
 
-            PlaceABet(bj);
+                    isRoundFinished = false;
+                }
 
-            bj.FirstDeal();
+                bj.GameEnd += PrintGameOutcome;
 
-            //PrintCardsInfo(bj);
+                WriteLine($"\nYour current amount of money is { bj.Money }.\n");
 
-            bj.BlackjackCheckInit();
+                PlaceABet(bj);
 
-            PerformUserAction(bj);
+                bj.FirstDeal();
 
-            bj.CheckValues(true);
+                bj.BlackjackCheckInit();
 
-            ReadLine();
+                // Если блекджек не случился
+                if (!isRoundFinished)
+                    PerformUserAction(bj);
+
+                // Если после действий пользователя раунд всё ещё не окончен
+                if (!isRoundFinished)
+                    bj.CheckValues(true);
+
+                WriteLine(bj.Money > 0
+                    ? "\nPress 'Enter' to continue to the next round or 'Esc' to exit."
+                    : "\nYou're out of money! Game over.");
+            } while (ReadKey().Key != ConsoleKey.Escape && bj.Money > 0);
         }
 
         private static void PerformUserAction(Blackjack.Blackjack bj)
@@ -38,11 +57,17 @@ namespace Blackjack
 
             do
             {
-                PrintCardsInfo(bj);
+                if(isRoundFinished)
+                    break;
 
-                WriteLine("\n1. Hit\n2. Stand\n");
-                Write("Your action: ");
+                PrintCardsInfo(bj.Hands, bj.House);
+
+                WriteLine("\n1. Hit\n2. Stand");
+                if(bj.Hands.ElementAt(0).HandCards.Count == 2)
+                    WriteLine("3. Double Down");
+                Write("\nYour action: ");
                 action = ReadKey();
+                WriteLine();
 
                 if (action.Key != ConsoleKey.D1 && action.Key != ConsoleKey.D2)
                 {
@@ -54,16 +79,18 @@ namespace Blackjack
                     bj.Hit();
                 else
                     bj.Stand();
-
-            } while (action.Key != ConsoleKey.D2);
-
-            PrintCardsInfo(bj);
+            }
+            while (action.Key != ConsoleKey.D2);
         }
 
-        private static void PrintGameOutcome(string s, decimal m)
+        private static void PrintGameOutcome(string s, decimal m, List<Hand> hands, House house)
         {
+            WriteLine("\n\nRound finished with the following outcome:");
+            PrintCardsInfo(hands, house);
             Write("\n" + s);
             WriteLine($"{m}$\n");
+
+            isRoundFinished = true;
         }
 
         private static void PlaceABet(Blackjack.Blackjack bj)
@@ -98,43 +125,43 @@ namespace Blackjack
             }
         }
 
-        private static void PrintCardsInfo(Blackjack.Blackjack bj)
+        private static void PrintCardsInfo(List<Hand> hands, House house)
         {
-            PrintUserCards(bj);
-
-            PrintHouseCards(bj);
+            PrintUserCards(hands);
+            PrintHouseCards(house);
         }
 
-        private static void PrintUserCards(Blackjack.Blackjack bj)
+        private static void PrintUserCards(List<Hand> hands)
         {
-            var hands = bj.Hands.ElementAt(0);
+            var hand = hands.ElementAt(0);
 
-            WriteLine($"\n\nYour cards ({hands.Value}" +
-                      $"{(hands.AlternativeValue != null ? "/" + hands.AlternativeValue : string.Empty)}):");
-            PrintCards(hands.HandCards);
+            WriteLine($"\nYour cards ({ hand.Value }" +
+                      $"{ (hand.AlternativeValue != null ? "/" + hand.AlternativeValue : string.Empty) }):");
+            PrintCards(hand.HandCards);
         }
 
-        private static void PrintHouseCards(Blackjack.Blackjack bj)
+        private static void PrintHouseCards(House house)
         {
-            WriteLine($"\nHouse cards ({bj.House.Value}" +
-                      $"{(bj.House.AlternativeValue != null ? "/" + bj.House.AlternativeValue : string.Empty)}):");
+            // Если первая раздача
+            if (house.HouseCards.Count == 2)
+            {
+                WriteLine("\nHouse cards:");
+                WriteLine(" - " + house.HouseCards.First());
+                WriteLine(" - [CLOSED]");
+            }
+            else
+            {
+                WriteLine($"\nHouse cards ({ house.Value }" +
+                          $"{ (house.AlternativeValue != null ? "/" + house.AlternativeValue : string.Empty) }):");
 
-            PrintCards(bj.House.HouseCards);
+                PrintCards(house.HouseCards);
+            }
         }
 
         private static void PrintCards(List<Card> cards)
         {
             foreach (var card in cards)
-                WriteLine(card);
-        }
-
-        private static void SubscribeToEvents(Blackjack.Blackjack bj)
-        {
-            bj.BustEvent += PrintGameOutcome;
-            bj.PushEvent += PrintGameOutcome;
-            bj.WinEvent += PrintGameOutcome;
-            bj.LoseEvent += PrintGameOutcome;
-            bj.BlackjackEvent += PrintGameOutcome;
+                WriteLine(" - " + card);
         }
     }
 }

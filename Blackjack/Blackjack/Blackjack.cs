@@ -5,21 +5,15 @@ using System.Linq;
 
 namespace Blackjack.Blackjack
 {
-    public delegate void BustHandler(string s, decimal m);
-    public delegate void PushHandler(string s, decimal m);
-    public delegate void WinHandler(string s, decimal m);
-    public delegate void LoseHandler(string s, decimal m);
-    public delegate void BlackjackHandler(string s, decimal m);
-
     public class Blackjack
     {
         #region Members
 
         // Игрок
-        public List<Hand> Hands { get; set; }
+        public List<Hand> Hands { get; private set; }
 
         // Крупье
-        public House House { get; set; }
+        public House House { get; private set; }
 
         // Деньги для ставок
         public decimal Money { get; private set; }
@@ -29,7 +23,7 @@ namespace Blackjack.Blackjack
 
         public decimal CurrentBet
         {
-            get => _currentBet;
+            private get => _currentBet;
             set
             {
                 if (value > Money)
@@ -45,17 +39,13 @@ namespace Blackjack.Blackjack
         }
 
         // Колода, используемая в игре
-        public Deck.Deck Cards { get; private set; }
+        private Deck.Deck Cards { get; set; }
 
-        public List<Card> FaceCards { get; private set; }
+        private List<Card> FaceCards { get; set; }
 
-        public Dictionary<Card, byte> CardValues { get; private set; }
+        private Dictionary<Card, byte> CardValues { get; set; }
 
-        public event BustHandler BustEvent;
-        public event PushHandler PushEvent;
-        public event WinHandler WinEvent;
-        public event LoseHandler LoseEvent;
-        public event BlackjackHandler BlackjackEvent;
+        public event GameHandler GameEnd;
 
         #endregion
 
@@ -70,8 +60,8 @@ namespace Blackjack.Blackjack
 
             AddCard(Cards);
 
-            Hands = new List<Hand> {new Hand()};
-            House = House.GetHouse;
+            Hands = new List<Hand> { new Hand() };
+            House = new House();
         }
 
         private void AddCard(Deck.Deck cards)
@@ -144,7 +134,7 @@ namespace Blackjack.Blackjack
             DealHouseCards(2);
         }
 
-        public void DealHouseCards(int cardsToDeal)
+        private void DealHouseCards(int cardsToDeal)
         {
             House.HouseCards.AddRange(Cards.DeckOfCards.Take(cardsToDeal));
             Cards.DeckOfCards.RemoveRange(0, cardsToDeal);
@@ -157,7 +147,7 @@ namespace Blackjack.Blackjack
                 CheckValues();
         }
 
-        public void DealUserCards(int cardsToDeal, int handIndex = 0)
+        private void DealUserCards(int cardsToDeal, int handIndex = 0)
         {
             Hands.ElementAt(handIndex).HandCards
                 .AddRange(Cards.DeckOfCards.Take(cardsToDeal));
@@ -240,20 +230,21 @@ namespace Blackjack.Blackjack
             // TODO: 2. After Split && 1st Deal in a new Hand
             if (currentHandCards.Count == 2 && House.HouseCards.Count == 2)
             {
-                bool handBlackjack = BlackjackCheck(currentHandCards);
-                bool houseBlackjack = BlackjackCheck(House.HouseCards);
+                var handBlackjack = BlackjackCheck(currentHandCards);
+                var houseBlackjack = BlackjackCheck(House.HouseCards);
 
                 // Ничья
                 if (handBlackjack && houseBlackjack)
                 {
-                    PushEvent?.Invoke("Push just happened! You and House both have blackjack! \n\n+", CurrentBet);
+                    GameEnd?.Invoke("Push just happened! You and House both have blackjack! \n\n+", 
+                        CurrentBet, Hands, House);
                     Push();
                 }
                 else if (handBlackjack)
                     BlackJackInit();
                 else if (houseBlackjack)
                 {
-                    LoseEvent?.Invoke("House has blackjack! You lose. \n\n-", CurrentBet);
+                    GameEnd?.Invoke("House has blackjack! You lose. \n\n-", CurrentBet, Hands, House);
                     Lose();
                 }
             }
@@ -295,17 +286,20 @@ namespace Blackjack.Blackjack
 
             if (finalHandlValue == finalHouseValue)
             {
-                PushEvent?.Invoke("Push just happened! You have the same value as the house. \n\n+", CurrentBet);
+                GameEnd?.Invoke("Push just happened! You have the same value as the house. \n\n+", 
+                    CurrentBet, Hands, House);
                 Push();
             }
             else if (finalHandlValue > finalHouseValue)
             {
-                WinEvent?.Invoke("You have more points than the House. You won! \n\n+", CurrentBet * 2);
+                GameEnd?.Invoke("You have more points than the House. You won! \n\n+",
+                    CurrentBet * 2, Hands, House);
                 Win();
             }
             else if (finalHandlValue < finalHouseValue)
             {
-                LoseEvent?.Invoke("House has more points than you. You lose. \n\n-", CurrentBet);
+                GameEnd?.Invoke("House has more points than you. You lose. \n\n-"
+                    , CurrentBet, Hands, House);
                 Lose();
             }
         }
@@ -314,17 +308,20 @@ namespace Blackjack.Blackjack
         {
             if (handValue > 21 && houseValue > 21)
             {
-                PushEvent?.Invoke("Push just happened! You and House both busted. \n\n+", CurrentBet);
+                GameEnd?.Invoke("Push just happened! You and House both busted. \n\n+",
+                    CurrentBet, Hands, House);
                 Push();
             }
             else if (handValue > 21)
             {
-                BustEvent?.Invoke("Bust just happened! Hand is worth more than 21. \n\n-", CurrentBet);
+                GameEnd?.Invoke("Bust just happened! Hand is worth more than 21. \n\n-", 
+                    CurrentBet, Hands, House);
                 Bust();
             }
             else if (houseValue > 21)
             {
-                WinEvent?.Invoke("House has more than 21. You win! \n\n+", CurrentBet * 2);
+                GameEnd?.Invoke("House has more than 21. You win! \n\n+", 
+                    CurrentBet * 2, Hands, House);
                 Win();
             }
         }
@@ -394,7 +391,8 @@ namespace Blackjack.Blackjack
             Money += gain;
             CurrentBet = 0;
 
-            BlackjackEvent?.Invoke("Congratulations! You have blackjack! \n\n+", gain);
+            GameEnd?.Invoke("Congratulations! You have blackjack! \n\n+", 
+                gain, Hands, House);
         }
 
         #endregion
