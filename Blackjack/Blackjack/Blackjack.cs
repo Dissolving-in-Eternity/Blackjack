@@ -23,7 +23,7 @@ namespace Blackjack.Blackjack
 
         public decimal CurrentBet
         {
-            private get => _currentBet;
+            get => _currentBet;
             set
             {
                 if (value > Money)
@@ -343,23 +343,14 @@ namespace Blackjack.Blackjack
                 DealHouseCards(1);
         }
 
-        // TODO: Test and Improve
-        public void DoubleDown(int handIndex)
+        public void DoubleDown()
         {
-            // Если количество карт на руках - 2
-            if (Hands.ElementAt(handIndex).HandCards.Count == 2)
-            {
-                // Хватает ли денег, чтобы удвоить ставку
-                if (Money >= CurrentBet * 2)
-                {
-                    // Удваиваем ставку
-                    CurrentBet *= 2;
-                    Money -= CurrentBet * 2;
+            // Удваиваем ставку
+            Money -= CurrentBet;
+            CurrentBet *= 2;
 
-                    // Получаем ещё одну карту (TODO: и только одну до конца раунда)
-                    DealUserCards(1);
-                }
-            }
+            // Получаем ещё одну карту
+            DealUserCards(1);
         }
 
         // TODO: Split

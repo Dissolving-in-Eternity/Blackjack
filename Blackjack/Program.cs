@@ -53,6 +53,14 @@ namespace Blackjack
 
         private static void PerformUserAction(Blackjack.Blackjack bj)
         {
+            //Dictionary<ConsoleKey, Action> actions = 
+            //    new Dictionary<ConsoleKey, Action>
+            //    {
+            //        { ConsoleKey.D1, bj.Hit },
+            //        { ConsoleKey.D2, bj.Stand },
+            //        { ConsoleKey.D3, bj.DoubleDown }
+            //    };
+
             ConsoleKeyInfo action;
 
             do
@@ -60,16 +68,23 @@ namespace Blackjack
                 if(isRoundFinished)
                     break;
 
-                PrintCardsInfo(bj.Hands, bj.House);
+                var isDoubleDownAvaliable = 
+                    bj.Hands.ElementAt(0).HandCards.Count == 2 && bj.Money > bj.CurrentBet;
 
-                WriteLine("\n1. Hit\n2. Stand");
-                if(bj.Hands.ElementAt(0).HandCards.Count == 2)
+                if (bj.House.ShowAllCards)
+                    PrintCardsInfo(bj.Hands, bj.House, true);
+                else
+                    PrintCardsInfo(bj.Hands, bj.House);
+
+                WriteLine("\n1. Hit");
+                WriteLine("2. Stand");
+                if(isDoubleDownAvaliable)
                     WriteLine("3. Double Down");
                 Write("\nYour action: ");
                 action = ReadKey();
                 WriteLine();
 
-                if (action.Key != ConsoleKey.D1 && action.Key != ConsoleKey.D2)
+                if (action.Key != ConsoleKey.D1 && action.Key != ConsoleKey.D2 && action.Key != ConsoleKey.D3)
                 {
                     WriteLine("\nWrong character.");
                     continue;
@@ -77,8 +92,23 @@ namespace Blackjack
 
                 if (action.Key == ConsoleKey.D1)
                     bj.Hit();
-                else
+                else if (action.Key == ConsoleKey.D2)
                     bj.Stand();
+                else
+                {
+                    if(isDoubleDownAvaliable)
+                    {
+                        bj.DoubleDown();
+
+                        // Обеспечиваем условие последней взятой карты за раунд
+                        if(!isRoundFinished)
+                            bj.Stand();
+
+                        break;
+                    }
+
+                    WriteLine("Action not avaliable");
+                }
             }
             while (action.Key != ConsoleKey.D2);
         }
@@ -86,7 +116,7 @@ namespace Blackjack
         private static void PrintGameOutcome(string s, decimal m, List<Hand> hands, House house)
         {
             WriteLine("\n\nRound finished with the following outcome:");
-            PrintCardsInfo(hands, house);
+            PrintCardsInfo(hands, house, true);
             Write("\n" + s);
             WriteLine($"{m}$\n");
 
@@ -125,10 +155,10 @@ namespace Blackjack
             }
         }
 
-        private static void PrintCardsInfo(List<Hand> hands, House house)
+        private static void PrintCardsInfo(List<Hand> hands, House house, bool showAllCards = false)
         {
             PrintUserCards(hands);
-            PrintHouseCards(house);
+            PrintHouseCards(house, showAllCards);
         }
 
         private static void PrintUserCards(List<Hand> hands)
@@ -140,10 +170,9 @@ namespace Blackjack
             PrintCards(hand.HandCards);
         }
 
-        private static void PrintHouseCards(House house)
+        private static void PrintHouseCards(House house, bool showAllCards)
         {
-            // Если первая раздача
-            if (house.HouseCards.Count == 2)
+            if (!showAllCards)
             {
                 WriteLine("\nHouse cards:");
                 WriteLine(" - " + house.HouseCards.First());

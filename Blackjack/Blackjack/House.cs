@@ -11,6 +11,8 @@ namespace Blackjack.Blackjack
 
         public byte? AlternativeValue { get; set; }
 
+        public bool ShowAllCards { get; set; }
+
         public House()
         {
             HouseCards = new List<Card>();
