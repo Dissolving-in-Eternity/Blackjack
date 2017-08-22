@@ -1,30 +1,27 @@
-﻿using Blackjack.Blackjack;
-using Blackjack.Deck;
+﻿using Blackjack.Deck;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using static System.Console;
 
-namespace Blackjack
+namespace Game
 {
     internal static class Program
     {
-        private static bool isRoundFinished;
-
         private static void Main(string[] args)
         {
-            var bj = new Blackjack.Blackjack(500);
+            var bj = new Blackjack(500);
 
             WriteLine("Welcome to the Blackjack by Pride!");
 
             do
             {
-                if (isRoundFinished)
+                if (Blackjack.IsRoundFinished)
                 {
                     var moneyFromTheLastRound = bj.Money;
-                    bj = new Blackjack.Blackjack(moneyFromTheLastRound);
+                    bj = new Blackjack(moneyFromTheLastRound);
 
-                    isRoundFinished = false;
+                    Blackjack.IsRoundFinished = false;
                 }
 
                 bj.GameEnd += PrintGameOutcome;
@@ -38,11 +35,11 @@ namespace Blackjack
                 bj.BlackjackCheckInit();
 
                 // Если блекджек не случился
-                if (!isRoundFinished)
+                if (!Blackjack.IsRoundFinished)
                     PerformUserAction(bj);
 
                 // Если после действий пользователя раунд всё ещё не окончен
-                if (!isRoundFinished)
+                if (!Blackjack.IsRoundFinished)
                     bj.CheckValues(true);
 
                 WriteLine(bj.Money > 0
@@ -51,7 +48,7 @@ namespace Blackjack
             } while (ReadKey().Key != ConsoleKey.Escape && bj.Money > 0);
         }
 
-        private static void PerformUserAction(Blackjack.Blackjack bj)
+        private static void PerformUserAction(Blackjack bj)
         {
             //Dictionary<ConsoleKey, Action> actions = 
             //    new Dictionary<ConsoleKey, Action>
@@ -65,7 +62,7 @@ namespace Blackjack
 
             do
             {
-                if(isRoundFinished)
+                if(Blackjack.IsRoundFinished)
                     break;
 
                 var isDoubleDownAvaliable = 
@@ -101,7 +98,7 @@ namespace Blackjack
                         bj.DoubleDown();
 
                         // Обеспечиваем условие последней взятой карты за раунд
-                        if(!isRoundFinished)
+                        if(!Blackjack.IsRoundFinished)
                             bj.Stand();
 
                         break;
@@ -120,10 +117,10 @@ namespace Blackjack
             Write("\n" + s);
             WriteLine($"{m}$\n");
 
-            isRoundFinished = true;
+            Blackjack.IsRoundFinished = true;
         }
 
-        private static void PlaceABet(Blackjack.Blackjack bj)
+        private static void PlaceABet(Blackjack bj)
         {
             while (true)
             {

@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace Blackjack.Blackjack
+namespace Game
 {
     public delegate void GameHandler(string s, decimal m, List<Hand> hands, House house);
 }

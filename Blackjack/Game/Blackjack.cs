@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Blackjack.Blackjack
+namespace Game
 {
     public class Blackjack
     {
@@ -39,7 +39,7 @@ namespace Blackjack.Blackjack
         }
 
         // Колода, используемая в игре
-        private Deck.Deck Cards { get; set; }
+        private Deck Cards { get; set; }
 
         private List<Card> FaceCards { get; set; }
 
@@ -47,13 +47,16 @@ namespace Blackjack.Blackjack
 
         public event GameHandler GameEnd;
 
+        public static bool IsRoundFinished;
+
+
         #endregion
 
         #region Init
 
         public Blackjack(decimal startMoney)
         {
-            Cards = new Deck.Deck();
+            Cards = new Deck();
             FaceCards = new List<Card>();
             CardValues = new Dictionary<Card, byte>();
             Money = startMoney;
@@ -64,7 +67,7 @@ namespace Blackjack.Blackjack
             House = new House();
         }
 
-        private void AddCard(Deck.Deck cards)
+        private void AddCard(Deck cards)
         {
             foreach (var card in cards.DeckOfCards)
             {

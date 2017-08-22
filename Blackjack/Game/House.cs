@@ -1,7 +1,7 @@
 using Blackjack.Deck;
 using System.Collections.Generic;
 
-namespace Blackjack.Blackjack
+namespace Game
 {
     public class House
     {
