@@ -50,74 +50,56 @@ namespace Game
 
         private static void PerformUserAction(Blackjack bj)
         {
-            //Dictionary<ConsoleKey, Action> actions = 
-            //    new Dictionary<ConsoleKey, Action>
-            //    {
-            //        { ConsoleKey.D1, bj.Hit },
-            //        { ConsoleKey.D2, bj.Stand },
-            //        { ConsoleKey.D3, bj.DoubleDown }
-            //    };
+            var actions =
+                new Dictionary<ConsoleKey, Action>
+                {
+                    { ConsoleKey.D1, bj.Hit },
+                    { ConsoleKey.D2, bj.Stand },
+                    { ConsoleKey.D3, bj.DoubleDown }
+                };
 
-            ConsoleKeyInfo action;
+            ConsoleKey action;
 
             do
             {
                 if(Blackjack.IsRoundFinished)
                     break;
 
-                var isDoubleDownAvaliable = 
-                    bj.Hands.ElementAt(0).HandCards.Count == 2 && bj.Money > bj.CurrentBet;
-
-                if (bj.House.ShowAllCards)
-                    PrintCardsInfo(bj.Hands, bj.House, true);
-                else
-                    PrintCardsInfo(bj.Hands, bj.House);
+                PrintCardsInfo(bj.Hands, bj.House);
 
                 WriteLine("\n1. Hit");
                 WriteLine("2. Stand");
-                if(isDoubleDownAvaliable)
+                if(Blackjack.IsDoubleDownAvailable)
                     WriteLine("3. Double Down");
                 Write("\nYour action: ");
-                action = ReadKey();
+                action = ReadKey().Key;
                 WriteLine();
 
-                if (action.Key != ConsoleKey.D1 && action.Key != ConsoleKey.D2 && action.Key != ConsoleKey.D3)
+                if(!actions.ContainsKey(action))
                 {
                     WriteLine("\nWrong character.");
                     continue;
                 }
 
-                if (action.Key == ConsoleKey.D1)
-                    bj.Hit();
-                else if (action.Key == ConsoleKey.D2)
-                    bj.Stand();
+                Action todo;
+                actions.TryGetValue(action, out todo);
+
+                if (todo != null)
+                    todo();
                 else
-                {
-                    if(isDoubleDownAvaliable)
-                    {
-                        bj.DoubleDown();
-
-                        // Обеспечиваем условие последней взятой карты за раунд
-                        if(!Blackjack.IsRoundFinished)
-                            bj.Stand();
-
-                        break;
-                    }
-
                     WriteLine("Action not avaliable");
-                }
             }
-            while (action.Key != ConsoleKey.D2);
+            while (action != ConsoleKey.D2 && action != ConsoleKey.D3);
         }
 
         private static void PrintGameOutcome(string s, decimal m, List<Hand> hands, House house)
         {
+            Blackjack.IsRoundFinished = true;
+
             WriteLine("\n\nRound finished with the following outcome:");
-            PrintCardsInfo(hands, house, true);
+            PrintCardsInfo(hands, house);
             Write("\n" + s);
             WriteLine($"{m}$\n");
-
-            Blackjack.IsRoundFinished = true;
         }
 
         private static void PlaceABet(Blackjack bj)
@@ -152,10 +134,10 @@ namespace Game
             }
         }
 
-        private static void PrintCardsInfo(List<Hand> hands, House house, bool showAllCards = false)
+        private static void PrintCardsInfo(List<Hand> hands, House house)
         {
             PrintUserCards(hands);
-            PrintHouseCards(house, showAllCards);
+            PrintHouseCards(house);
         }
 
         private static void PrintUserCards(List<Hand> hands)
@@ -167,9 +149,9 @@ namespace Game
             PrintCards(hand.HandCards);
         }
 
-        private static void PrintHouseCards(House house, bool showAllCards)
+        private static void PrintHouseCards(House house)
         {
-            if (!showAllCards)
+            if (!Blackjack.IsRoundFinished)
             {
                 WriteLine("\nHouse cards:");
                 WriteLine(" - " + house.HouseCards.First());

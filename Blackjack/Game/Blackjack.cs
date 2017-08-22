@@ -49,6 +49,10 @@ namespace Game
 
         public static bool IsRoundFinished;
 
+        public static bool IsFirstDeal;
+
+        public static bool IsDoubleDownAvailable;
+
 
         #endregion
 
@@ -65,6 +69,7 @@ namespace Game
 
             Hands = new List<Hand> { new Hand() };
             House = new House();
+            IsFirstDeal = true;
         }
 
         private void AddCard(Deck cards)
@@ -135,6 +140,26 @@ namespace Game
 
             DealUserCards(2);
             DealHouseCards(2);
+
+            if (Money >= CurrentBet * 2)
+                IsDoubleDownAvailable = true;
+
+            IsFirstDeal = false;
+        }
+
+        private void DealUserCards(int cardsToDeal, int handIndex = 0)
+        {
+            Hands.ElementAt(handIndex).HandCards
+                .AddRange(Cards.DeckOfCards.Take(cardsToDeal));
+            Cards.DeckOfCards.RemoveRange(0, cardsToDeal);
+
+            CalculateHandValues(handIndex);
+
+            if (!IsFirstDeal)
+            {
+                IsDoubleDownAvailable = false;
+                CheckValues();
+            }
         }
 
         private void DealHouseCards(int cardsToDeal)
@@ -146,19 +171,7 @@ namespace Game
             CalculateHouseValues();
 
             // Обязательная проверка на Bust после каждой раздачи, кроме первой
-            if(House.HouseCards.Count > 2)
-                CheckValues();
-        }
-
-        private void DealUserCards(int cardsToDeal, int handIndex = 0)
-        {
-            Hands.ElementAt(handIndex).HandCards
-                .AddRange(Cards.DeckOfCards.Take(cardsToDeal));
-            Cards.DeckOfCards.RemoveRange(0, cardsToDeal);
-
-            CalculateHandValues(handIndex);
-
-            if(Hands.ElementAt(handIndex).HandCards.Count > 2)
+            if(!IsFirstDeal)
                 CheckValues();
         }
 
@@ -188,15 +201,14 @@ namespace Game
         private byte CalculateCurrentValue(List<Card> cards, ref byte? altValue)
         {
             byte value = 0;
-            bool isFirstDeal = cards.Count == 2;
 
             // На случай 2-х тузов после 1-й раздачи
-            if (isFirstDeal && cards.All(c => c.Rank == Rank.Ace))
+            if (IsFirstDeal && cards.All(c => c.Rank == Rank.Ace))
             {
                 value = 2;
                 altValue = 12;
             }
-            else if (isFirstDeal && BlackjackCheck(cards))
+            else if (IsFirstDeal && BlackjackCheck(cards))
             {
                 value = 21;
                 altValue = null;
@@ -348,12 +360,20 @@ namespace Game
 
         public void DoubleDown()
         {
-            // Удваиваем ставку
-            Money -= CurrentBet;
-            CurrentBet *= 2;
+            if (IsDoubleDownAvailable)
+            {
+                // Удваиваем ставку
+                Money -= CurrentBet;
+                CurrentBet *= 2;
 
-            // Получаем ещё одну карту
-            DealUserCards(1);
+                // Получаем ещё одну карту
+                DealUserCards(1);
+
+                // Обеспечиваем условие последней взятой карты за раунд
+                if (!IsRoundFinished)
+                    Stand();
+            }
+            
         }
 
         // TODO: Split
