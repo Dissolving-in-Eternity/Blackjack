@@ -12,19 +12,21 @@ namespace Game
         {
             var bj = new Blackjack(500);
 
-            WriteLine("Welcome to the Blackjack by Pride!");
+            WriteLine("Welcome to the Blackjack by Pride!\n");
+            WriteLine("Blackjack pays 3 to 2.");
+            WriteLine("Dealer must draw to 16 and stand on 17.");
 
             do
             {
-                if (Blackjack.IsRoundFinished)
+                if (bj.Hands.All(h => h.IsHandOut))
                 {
                     var moneyFromTheLastRound = bj.Money;
                     bj = new Blackjack(moneyFromTheLastRound);
 
-                    Blackjack.IsRoundFinished = false;
+                    bj.CurHand.IsHandOut = false;
                 }
 
-                bj.GameEnd += PrintGameOutcome;
+                bj.Endgame += PrintGameOutcome;
 
                 WriteLine($"\nYour current amount of money is { bj.Money }.\n");
 
@@ -32,15 +34,7 @@ namespace Game
 
                 bj.FirstDeal();
 
-                bj.BlackjackCheckInit();
-
-                // Если блекджек не случился
-                if (!Blackjack.IsRoundFinished)
-                    PerformUserAction(bj);
-
-                // Если после действий пользователя раунд всё ещё не окончен
-                if (!Blackjack.IsRoundFinished)
-                    bj.CheckValues(true);
+                PerformUserAction(bj);
 
                 WriteLine(bj.Money > 0
                     ? "\nPress 'Enter' to continue to the next round or 'Esc' to exit."
@@ -54,52 +48,110 @@ namespace Game
                 new Dictionary<ConsoleKey, Action>
                 {
                     { ConsoleKey.D1, bj.Hit },
-                    { ConsoleKey.D2, bj.Stand },
-                    { ConsoleKey.D3, bj.DoubleDown }
+                    { ConsoleKey.D2, bj.Stand }
                 };
 
-            ConsoleKey action;
-
-            do
+            for (var i = 0; i < bj.Hands.Count; i++)
             {
-                if(Blackjack.IsRoundFinished)
-                    break;
+                bj.CurHand = bj.Hands[i];
 
-                PrintCardsInfo(bj.Hands, bj.House);
+                ConsoleKey action;
 
-                WriteLine("\n1. Hit");
-                WriteLine("2. Stand");
-                if(Blackjack.IsDoubleDownAvailable)
-                    WriteLine("3. Double Down");
-                Write("\nYour action: ");
-                action = ReadKey().Key;
-                WriteLine();
-
-                if(!actions.ContainsKey(action))
+                do
                 {
-                    WriteLine("\nWrong character.");
-                    continue;
-                }
+                    if (bj.CurHand.IsHandOut)
+                        break;
 
-                Action todo;
-                actions.TryGetValue(action, out todo);
+                    if (bj.Hands.Count > 1)
+                        WriteLine($"\nHand {i + 1}:");
 
-                if (todo != null)
-                    todo();
-                else
-                    WriteLine("Action not avaliable");
+                    PrintUserCards(bj.CurHand);
+                    PrintHouseCards(bj.House);
+
+                    CheckUserOptions(bj, actions);
+
+                    if (bj.Hands.Count > 1)
+                        WriteLine($"Avaliable actions for hand {i + 1}:");
+
+                    PrintActions(actions);
+
+                    Write("\nYour action: ");
+                    action = ReadKey().Key;
+                    WriteLine();
+
+                    if (!actions.ContainsKey(action))
+                    {
+                        WriteLine("\nWrong character.");
+                        continue;
+                    }
+
+                    actions.TryGetValue(action, out Action todo);
+
+                    if (todo != null)
+                        todo();
+                    else
+                        WriteLine("Action not avaliable");
+
+                } while (actions[action].Method.Name != "Stand" && actions[action].Method.Name != "DoubleDown");
+
+                if (!bj.CurHand.IsHandOut)
+                    bj.CheckValues(true);
             }
-            while (action != ConsoleKey.D2 && action != ConsoleKey.D3);
         }
 
-        private static void PrintGameOutcome(string s, decimal m, List<Hand> hands, House house)
+        private static void CheckUserOptions(Blackjack bj, Dictionary<ConsoleKey, Action> actions)
         {
-            Blackjack.IsRoundFinished = true;
+            if (!bj.CurHand.IsDoubleDownAvailable && actions.ContainsKey(ConsoleKey.D3))
+                actions.Remove(ConsoleKey.D3);
 
-            WriteLine("\n\nRound finished with the following outcome:");
-            PrintCardsInfo(hands, house);
-            Write("\n" + s);
-            WriteLine($"{m}$\n");
+            if (bj.CurHand.IsDoubleDownAvailable && !actions.ContainsKey(ConsoleKey.D3))
+                actions.Add(ConsoleKey.D3, bj.DoubleDown);
+
+            if (!bj.CurHand.IsSplitAvailable && actions.ContainsKey(ConsoleKey.D4))
+                actions.Remove(ConsoleKey.D4);
+
+            else if (bj.CurHand.IsSplitAvailable && !actions.ContainsKey(ConsoleKey.D4))
+                actions.Add(ConsoleKey.D4, bj.Split);
+        }
+
+        private static void PrintActions(Dictionary<ConsoleKey, Action> actions)
+        {
+            for (var j = 0; j < actions.Count; j++)
+                WriteLine($"{actions.Keys.ElementAt(j)}. {actions.Values.ElementAt(j).Method.Name}");
+        }
+
+        private static void PrintGameOutcome(Blackjack bj)
+        {
+            bj.CurHand.IsHandOut = true;
+
+            if(bj.Hands.Count > 1)
+                WriteLine("\nRound for the current hand is over.");
+
+            // If round is over
+            if (bj.Hands.All(h => h.IsHandOut))
+            {
+                bj.ExecOutcomeActions();
+
+                WriteLine("\nRound finished!");
+
+                if(bj.Hands.Count > 1)
+                    for (int i = 0; i < bj.Hands.Count; i++)
+                    {
+                        WriteLine($"\nHand { i + 1 }:");
+                        PrintUserCards(bj.Hands[i]);
+                    }
+                else
+                    PrintUserCards(bj.CurHand);
+
+                PrintHouseCards(bj.House, true);
+
+                for (var i = 0; i < bj.Outcomes.Count; i++)
+                {
+                    if(bj.Hands.Count > 1)
+                        WriteLine($"Hand { i + 1 }:");
+                    WriteLine($"{ bj.Outcomes[i] }\n");
+                }
+            }
         }
 
         private static void PlaceABet(Blackjack bj)
@@ -123,7 +175,8 @@ namespace Game
                         continue;
                     }
 
-                    bj.CurrentBet = bet;
+                    bj.CurHand.Bet = bet;
+                    bj.Money -= bj.CurHand.Bet;
 
                     break;
                 }
@@ -134,24 +187,16 @@ namespace Game
             }
         }
 
-        private static void PrintCardsInfo(List<Hand> hands, House house)
+        private static void PrintUserCards(Hand hand)
         {
-            PrintUserCards(hands);
-            PrintHouseCards(house);
-        }
-
-        private static void PrintUserCards(List<Hand> hands)
-        {
-            var hand = hands.ElementAt(0);
-
             WriteLine($"\nYour cards ({ hand.Value }" +
-                      $"{ (hand.AlternativeValue != null ? "/" + hand.AlternativeValue : string.Empty) }):");
+                        $"{ (hand.AlternativeValue != null ? "/" + hand.AlternativeValue : string.Empty) }):");
             PrintCards(hand.HandCards);
         }
 
-        private static void PrintHouseCards(House house)
+        private static void PrintHouseCards(House house, bool printAllCards = false)
         {
-            if (!Blackjack.IsRoundFinished)
+            if(!printAllCards)
             {
                 WriteLine("\nHouse cards:");
                 WriteLine(" - " + house.HouseCards.First());
@@ -164,6 +209,8 @@ namespace Game
 
                 PrintCards(house.HouseCards);
             }
+
+            WriteLine();
         }
 
         private static void PrintCards(List<Card> cards)

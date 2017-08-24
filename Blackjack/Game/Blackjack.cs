@@ -12,31 +12,13 @@ namespace Game
         // Игрок
         public List<Hand> Hands { get; private set; }
 
+        public Hand CurHand { get; set; }
+
         // Крупье
         public House House { get; private set; }
 
         // Деньги для ставок
-        public decimal Money { get; private set; }
-
-        // Ставка в текущем раунде
-        private decimal _currentBet;
-
-        public decimal CurrentBet
-        {
-            get => _currentBet;
-            set
-            {
-                if (value > Money)
-                    throw new ArgumentException("Not enough money.");
-
-                if(value < 0)
-                    throw new ArgumentOutOfRangeException(null, "Bet can't be less than 0");
-
-                _currentBet = value;
-
-                Money -= value;
-            }
-        }
+        public decimal Money { get; set; }
 
         // Колода, используемая в игре
         private Deck Cards { get; set; }
@@ -45,14 +27,11 @@ namespace Game
 
         private Dictionary<Card, byte> CardValues { get; set; }
 
-        public event GameHandler GameEnd;
+        public event GameHandler Endgame;
 
-        public static bool IsRoundFinished;
+        public List<string> Outcomes { get; set; }
 
-        public static bool IsFirstDeal;
-
-        public static bool IsDoubleDownAvailable;
-
+        private List<Action> OutcomeActions { get; set; }
 
         #endregion
 
@@ -68,8 +47,11 @@ namespace Game
             AddCard(Cards);
 
             Hands = new List<Hand> { new Hand() };
+            CurHand = Hands.ElementAt(0);
             House = new House();
-            IsFirstDeal = true;
+
+            Outcomes = new List<string>();
+            OutcomeActions = new List<Action>();
         }
 
         private void AddCard(Deck cards)
@@ -141,25 +123,40 @@ namespace Game
             DealUserCards(2);
             DealHouseCards(2);
 
-            if (Money >= CurrentBet * 2)
-                IsDoubleDownAvailable = true;
+            BlackjackCheckInit();
 
-            IsFirstDeal = false;
+            CurHand.IsFirstDeal = false;
         }
 
-        private void DealUserCards(int cardsToDeal, int handIndex = 0)
+        private void CheckUserOptions()
         {
-            Hands.ElementAt(handIndex).HandCards
-                .AddRange(Cards.DeckOfCards.Take(cardsToDeal));
+            // Double Down
+            if (Money >= CurHand.Bet && CurHand.HandCards.Count == 2)
+            {
+                CurHand.IsDoubleDownAvailable = true;
+
+                // Split
+                byte val1, val2;
+                CardValues.TryGetValue(CurHand.HandCards[0], out val1);
+                CardValues.TryGetValue(CurHand.HandCards[1], out val2);
+
+                CurHand.IsSplitAvailable = val1 == val2;
+            }
+            else
+            {
+                CurHand.IsDoubleDownAvailable = false;
+                CurHand.IsSplitAvailable = false;
+            }
+        }
+
+        private void DealUserCards(int cardsToDeal)
+        {
+            CurHand.HandCards.AddRange(Cards.DeckOfCards.Take(cardsToDeal));
             Cards.DeckOfCards.RemoveRange(0, cardsToDeal);
 
-            CalculateHandValues(handIndex);
+            CalculateHandValues();
 
-            if (!IsFirstDeal)
-            {
-                IsDoubleDownAvailable = false;
-                CheckValues();
-            }
+            CheckValues();
         }
 
         private void DealHouseCards(int cardsToDeal)
@@ -171,7 +168,7 @@ namespace Game
             CalculateHouseValues();
 
             // Обязательная проверка на Bust после каждой раздачи, кроме первой
-            if(!IsFirstDeal)
+            if(!CurHand.IsFirstDeal)
                 CheckValues();
         }
 
@@ -179,14 +176,18 @@ namespace Game
 
         #region Figure Out Values
 
-        private void CalculateHandValues(int handIndex)
+        private void CalculateHandValues()
         {
-            var hand = Hands.ElementAt(handIndex);
-            var altValue = hand.AlternativeValue;
+            foreach (var hand in Hands)
+            {
+                var altValue = hand.AlternativeValue;
 
-            hand.Value = CalculateCurrentValue(hand.HandCards, ref altValue);
+                hand.Value = CalculateCurrentValue(hand.HandCards, ref altValue);
 
-            hand.AlternativeValue = altValue;
+                hand.AlternativeValue = altValue;
+            }
+            
+            CheckUserOptions();
         }
 
         private void CalculateHouseValues()
@@ -203,12 +204,12 @@ namespace Game
             byte value = 0;
 
             // На случай 2-х тузов после 1-й раздачи
-            if (IsFirstDeal && cards.All(c => c.Rank == Rank.Ace))
+            if (CurHand.IsFirstDeal && cards.All(c => c.Rank == Rank.Ace))
             {
                 value = 2;
                 altValue = 12;
             }
-            else if (IsFirstDeal && BlackjackCheck(cards))
+            else if (CurHand.IsFirstDeal && BlackjackCheck(cards))
             {
                 value = 21;
                 altValue = null;
@@ -236,31 +237,29 @@ namespace Game
 
         #region Checks
 
-        public void BlackjackCheckInit(int handIndex = 0)
+        private void BlackjackCheckInit()
         {
-            var currentHandCards = Hands.ElementAt(handIndex).HandCards;
-
             // Blackjack check: 
             // 1. After 1st Deal (Ok)
-            // TODO: 2. After Split && 1st Deal in a new Hand
-            if (currentHandCards.Count == 2 && House.HouseCards.Count == 2)
+            // 2. After Split && 1st Deal in a new Hand (Hit, Ok)
+            if (CurHand.IsFirstDeal)
             {
-                var handBlackjack = BlackjackCheck(currentHandCards);
+                var handBlackjack = BlackjackCheck(CurHand.HandCards);
                 var houseBlackjack = BlackjackCheck(House.HouseCards);
 
                 // Ничья
                 if (handBlackjack && houseBlackjack)
                 {
-                    GameEnd?.Invoke("Push just happened! You and House both have blackjack! \n\n+", 
-                        CurrentBet, Hands, House);
-                    Push();
+                    Outcomes.Add("Push just happened! You and House both have blackjack! (+" + CurHand.Bet + "$)");
+                    OutcomeActions.Add(Push);
+                    Endgame?.Invoke(this);
                 }
                 else if (handBlackjack)
                     BlackJackInit();
                 else if (houseBlackjack)
                 {
-                    GameEnd?.Invoke("House has blackjack! You lose. \n\n-", CurrentBet, Hands, House);
-                    Lose();
+                    Outcomes.Add("House has blackjack!You lose. (- " + CurHand.Bet + "$)");
+                    Endgame?.Invoke(this);
                 }
             }
         }
@@ -274,10 +273,10 @@ namespace Game
             return false;
         }
 
-        public void CheckValues(bool isFinalCheck = false, int handIndex = 0)
+        public void CheckValues(bool isFinalCheck = false)
         {
-            var handValue = Hands.ElementAt(handIndex).Value;
-            var handAltValue = Hands.ElementAt(handIndex).AlternativeValue;
+            var handValue = CurHand.Value;
+            var handAltValue = CurHand.AlternativeValue;
 
             var houseValue = House.Value;
             var houseAltValue = House.AlternativeValue;
@@ -301,21 +300,20 @@ namespace Game
 
             if (finalHandlValue == finalHouseValue)
             {
-                GameEnd?.Invoke("Push just happened! You have the same value as the house. \n\n+", 
-                    CurrentBet, Hands, House);
-                Push();
+                Outcomes.Add("Push just happened! You have the same value as the house. (+" + CurHand.Bet + "$)");
+                OutcomeActions.Add(Push);
+                Endgame?.Invoke(this);
             }
             else if (finalHandlValue > finalHouseValue)
             {
-                GameEnd?.Invoke("You have more points than the House. You won! \n\n+",
-                    CurrentBet * 2, Hands, House);
-                Win();
+                Outcomes.Add("You have more points than the House. You won! (+" + CurHand.Bet * 2 + "$)");
+                OutcomeActions.Add(Win);
+                Endgame?.Invoke(this);
             }
             else if (finalHandlValue < finalHouseValue)
             {
-                GameEnd?.Invoke("House has more points than you. You lose. \n\n-"
-                    , CurrentBet, Hands, House);
-                Lose();
+                Outcomes.Add("House has more points than you. You lose. (-" + CurHand.Bet + "$)");
+                Endgame?.Invoke(this);
             }
         }
 
@@ -323,21 +321,20 @@ namespace Game
         {
             if (handValue > 21 && houseValue > 21)
             {
-                GameEnd?.Invoke("Push just happened! You and House both busted. \n\n+",
-                    CurrentBet, Hands, House);
-                Push();
+                Outcomes.Add("Push just happened! You and House both busted. (+" + CurHand.Bet + "$)");
+                OutcomeActions.Add(Push);
+                Endgame?.Invoke(this);
             }
             else if (handValue > 21)
             {
-                GameEnd?.Invoke("Bust just happened! Hand is worth more than 21. \n\n-", 
-                    CurrentBet, Hands, House);
-                Bust();
+                Outcomes.Add("Bust just happened! Hand is worth more than 21. (-" + CurHand.Bet + "$)");
+                Endgame?.Invoke(this);
             }
             else if (houseValue > 21)
             {
-                GameEnd?.Invoke("House has more than 21. You win! \n\n+", 
-                    CurrentBet * 2, Hands, House);
-                Win();
+                Outcomes.Add("House has more than 21. You win! (+" + CurHand.Bet * 2 + "$)");
+                OutcomeActions.Add(Win);
+                Endgame?.Invoke(this);
             }
         }
 
@@ -348,65 +345,83 @@ namespace Game
         public void Hit()
         {
             DealUserCards(1);
+
+            if (CurHand.HandCards.Count == 2)
+                if(BlackjackCheck(CurHand.HandCards))
+                    BlackJackInit();
         }
 
         public void Stand()
         {
             // Раздаём по 1 карте для House до тех пор, пока House Value\Alt. Value не достигнет 17
             while (House.Value < 17 ||
-                (House.AlternativeValue != null && House.AlternativeValue < 17))
+                House.AlternativeValue != null && House.AlternativeValue < 17)
                 DealHouseCards(1);
         }
 
         public void DoubleDown()
         {
-            if (IsDoubleDownAvailable)
+            if (CurHand.IsDoubleDownAvailable)
             {
                 // Удваиваем ставку
-                Money -= CurrentBet;
-                CurrentBet *= 2;
+                Money -= CurHand.Bet;
+                CurHand.Bet *= 2;
 
                 // Получаем ещё одну карту
                 DealUserCards(1);
 
-                // Обеспечиваем условие последней взятой карты за раунд
-                if (!IsRoundFinished)
+                // Обеспечиваем условие последней взятой карты
+                if (!CurHand.IsHandOut)
                     Stand();
             }
-            
+            else
+                throw new InvalidOperationException(
+                    "Not all conditions satisfy Double Down availability.");
         }
 
-        // TODO: Split
+        public void Split()
+        {
+            if (CurHand.IsSplitAvailable)
+            {
+                Money -= CurHand.Bet;
+                
+                var hand = new Hand();
+                hand.HandCards.Add(CurHand.HandCards.Last());
+                hand.Bet = CurHand.Bet;
+                Hands.Add(hand);
+
+                CurHand.HandCards.RemoveAt(1);
+
+                CalculateHandValues();
+            }
+            else
+                throw new InvalidOperationException(
+                    "Not all conditions satisfy Split availability.");
+        }
 
         #endregion
 
         #region Actions/Outcomes
 
-        private void Bust() => CurrentBet = 0;
+        private void Push() => Money += CurHand.Bet;
 
-        private void Push()
-        {
-            Money += CurrentBet;
-            CurrentBet = 0;
-        }
-
-        private void Win()
-        {
-            Money += CurrentBet * 2;
-            CurrentBet = 0;
-        }
-
-        private void Lose() => CurrentBet = 0;
+        private void Win() => Money += CurHand.Bet * 2;
 
         // 3 to 2
         private void BlackJackInit()
         {
-            var gain = CurrentBet * 2.5m;
+            var gain = CurHand.Bet * 2.5m;
             Money += gain;
-            CurrentBet = 0;
+            CurHand.Bet = 0;
 
-            GameEnd?.Invoke("Congratulations! You have blackjack! \n\n+", 
-                gain, Hands, House);
+            Outcomes.Add("Congratulations! You have blackjack! (+" + gain + "$)");
+            Endgame?.Invoke(this);
+        }
+
+        public void ExecOutcomeActions()
+        {
+            foreach (var action in OutcomeActions)
+                action.Invoke();
         }
 
         #endregion
