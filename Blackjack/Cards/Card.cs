@@ -1,4 +1,4 @@
-﻿namespace Blackjack.Deck
+﻿namespace Blackjack.Cards
 {
     public class Card
     {
@@ -9,11 +9,6 @@
         {
             Suit = suit;
             Rank = rank;
-        }
-
-        public override string ToString()
-        {
-            return string.Format($"{ Rank } of {Suit}");
         }
     }
 }

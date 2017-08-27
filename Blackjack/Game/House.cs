@@ -1,7 +1,7 @@
-using Blackjack.Deck;
+using Blackjack.Cards;
 using System.Collections.Generic;
 
-namespace Game
+namespace Blackjack.Game
 {
     public class House
     {
@@ -10,6 +10,8 @@ namespace Game
         public byte Value { get; set; }
 
         public byte? AlternativeValue { get; set; }
+
+        public const byte DrawTo = 17;
 
         public House()
         {

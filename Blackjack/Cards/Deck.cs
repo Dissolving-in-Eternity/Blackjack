@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Blackjack.Deck
+namespace Blackjack.Cards
 {
     public class Deck
     {
@@ -10,14 +10,14 @@ namespace Blackjack.Deck
 
         public List<Card> DeckOfCards { get; set; }
 
-        private Random random = new Random();
+        private readonly Random random = new Random();
 
         public Deck()
         {
             DeckOfCards = new List<Card>(DefaultDeckSize);
 
-            for (int suitIndex = 0; suitIndex < 4; suitIndex++)
-                for (int rankIndex = 0; rankIndex < DefaultDeckSize / 4; rankIndex++)
+            for (var suitIndex = 0; suitIndex < 4; suitIndex++)
+                for (var rankIndex = 0; rankIndex < DefaultDeckSize / 4; rankIndex++)
                     DeckOfCards.Add(new Card((Suit)suitIndex, (Rank)rankIndex));
         }
 

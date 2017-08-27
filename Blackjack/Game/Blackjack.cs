@@ -1,37 +1,45 @@
-﻿using Blackjack.Deck;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Blackjack.Cards;
 
-namespace Game
+namespace Blackjack.Game
 {
     public class Blackjack
     {
         #region Members
 
-        // Игрок
+        // Player
         public List<Hand> Hands { get; private set; }
 
         public Hand CurHand { get; set; }
 
-        // Крупье
         public House House { get; private set; }
 
-        // Деньги для ставок
+        // Money to bet
         public decimal Money { get; set; }
 
-        // Колода, используемая в игре
-        private Deck Cards { get; set; }
+        private Deck _cards { get; set; }
 
-        private List<Card> FaceCards { get; set; }
+        private List<Card> _faceCards { get; set; }
 
-        private Dictionary<Card, byte> CardValues { get; set; }
+        private Dictionary<Card, byte> _cardValues { get; set; }
 
-        public event GameHandler Endgame;
+        public event RoundHandler Endgame;
 
         public List<string> Outcomes { get; set; }
 
-        private List<Action> OutcomeActions { get; set; }
+        private List<Action> _outcomeActions { get; set; }
+
+        // Ace may count as 1 or 11
+        private const byte AceValue = 1;
+        private const byte AceAltValue = 11;
+
+        private const byte FaceCardValue = 10;
+
+        private const byte BlackjackValue = 21;
+
+        private byte _cardsToDeal;
 
         #endregion
 
@@ -39,19 +47,21 @@ namespace Game
 
         public Blackjack(decimal startMoney)
         {
-            Cards = new Deck();
-            FaceCards = new List<Card>();
-            CardValues = new Dictionary<Card, byte>();
+            _cards = new Deck();
+            _faceCards = new List<Card>();
+            _cardValues = new Dictionary<Card, byte>();
             Money = startMoney;
 
-            AddCard(Cards);
+            AddCard(_cards);
 
             Hands = new List<Hand> { new Hand() };
             CurHand = Hands.ElementAt(0);
             House = new House();
 
             Outcomes = new List<string>();
-            OutcomeActions = new List<Action>();
+            _outcomeActions = new List<Action>();
+
+            _cardsToDeal = 2;
         }
 
         private void AddCard(Deck cards)
@@ -61,7 +71,7 @@ namespace Game
                 switch (card.Rank)
                 {
                     case Rank.Ace:
-                        CardValues.Add(card, 1);
+                        _cardValues.Add(card, 1);
                         break;
                     case Rank.King:
                         AddFaceCard(card);
@@ -73,31 +83,31 @@ namespace Game
                         AddFaceCard(card);
                         break;
                     case Rank.Ten:
-                        CardValues.Add(card, 10);
+                        _cardValues.Add(card, 10);
                         break;
                     case Rank.Nine:
-                        CardValues.Add(card, 9);
+                        _cardValues.Add(card, 9);
                         break;
                     case Rank.Eight:
-                        CardValues.Add(card, 8);
+                        _cardValues.Add(card, 8);
                         break;
                     case Rank.Seven:
-                        CardValues.Add(card, 7);
+                        _cardValues.Add(card, 7);
                         break;
                     case Rank.Six:
-                        CardValues.Add(card, 6);
+                        _cardValues.Add(card, 6);
                         break;
                     case Rank.Five:
-                        CardValues.Add(card, 5);
+                        _cardValues.Add(card, 5);
                         break;
                     case Rank.Four:
-                        CardValues.Add(card, 4);
+                        _cardValues.Add(card, 4);
                         break;
                     case Rank.Three:
-                        CardValues.Add(card, 3);
+                        _cardValues.Add(card, 3);
                         break;
                     case Rank.Two:
-                        CardValues.Add(card, 2);
+                        _cardValues.Add(card, 2);
                         break;
                     default:
                         throw new InvalidOperationException("Unknown card rank");
@@ -107,8 +117,8 @@ namespace Game
 
         private void AddFaceCard(Card card)
         {
-            FaceCards.Add(card);
-            CardValues.Add(card, 10);
+            _faceCards.Add(card);
+            _cardValues.Add(card, FaceCardValue);
         }
 
         #endregion
@@ -117,42 +127,41 @@ namespace Game
 
         public void FirstDeal()
         {
-            // Перемешиваем карты
-            Cards.Shuffle();
+            _cards.Shuffle();
 
-            DealUserCards(2);
-            DealHouseCards(2);
+            DealUserCards(_cardsToDeal);
+            DealHouseCards(_cardsToDeal);
 
             BlackjackCheckInit();
 
             CurHand.IsFirstDeal = false;
+            _cardsToDeal = 1;
         }
 
         private void CheckUserOptions()
         {
-            // Double Down
-            if (Money >= CurHand.Bet && CurHand.HandCards.Count == 2)
-            {
-                CurHand.IsDoubleDownAvailable = true;
-
-                // Split
-                byte val1, val2;
-                CardValues.TryGetValue(CurHand.HandCards[0], out val1);
-                CardValues.TryGetValue(CurHand.HandCards[1], out val2);
-
-                CurHand.IsSplitAvailable = val1 == val2;
-            }
-            else
+            // Double Down availability
+            if (Money < CurHand.Bet || CurHand.HandCards.Count != 2)
             {
                 CurHand.IsDoubleDownAvailable = false;
                 CurHand.IsSplitAvailable = false;
+
+                return;
             }
+
+            CurHand.IsDoubleDownAvailable = true;
+
+            // Split availability
+            _cardValues.TryGetValue(CurHand.HandCards[0], out var firstCardOnHandValue);
+            _cardValues.TryGetValue(CurHand.HandCards[1], out var secondCardOnHandValue);
+
+            CurHand.IsSplitAvailable = firstCardOnHandValue == secondCardOnHandValue;
         }
 
         private void DealUserCards(int cardsToDeal)
         {
-            CurHand.HandCards.AddRange(Cards.DeckOfCards.Take(cardsToDeal));
-            Cards.DeckOfCards.RemoveRange(0, cardsToDeal);
+            CurHand.HandCards.AddRange(_cards.DeckOfCards.Take(cardsToDeal));
+            _cards.DeckOfCards.RemoveRange(0, cardsToDeal);
 
             CalculateHandValues();
 
@@ -161,13 +170,12 @@ namespace Game
 
         private void DealHouseCards(int cardsToDeal)
         {
-            House.HouseCards.AddRange(Cards.DeckOfCards.Take(cardsToDeal));
-            Cards.DeckOfCards.RemoveRange(0, cardsToDeal);
+            House.HouseCards.AddRange(_cards.DeckOfCards.Take(cardsToDeal));
+            _cards.DeckOfCards.RemoveRange(0, cardsToDeal);
 
-            // Вычисление текущего value карт
             CalculateHouseValues();
 
-            // Обязательная проверка на Bust после каждой раздачи, кроме первой
+            // Mandatory Bust check after every deal except the first
             if(!CurHand.IsFirstDeal)
                 CheckValues();
         }
@@ -201,35 +209,36 @@ namespace Game
 
         private byte CalculateCurrentValue(List<Card> cards, ref byte? altValue)
         {
-            byte value = 0;
-
-            // На случай 2-х тузов после 1-й раздачи
+            // In case of 2 aces after the first deal
             if (CurHand.IsFirstDeal && cards.All(c => c.Rank == Rank.Ace))
             {
-                value = 2;
-                altValue = 12;
+                altValue = AceValue + AceAltValue;
+
+                return AceValue + AceValue;
             }
-            else if (CurHand.IsFirstDeal && BlackjackCheck(cards))
+
+            if (CurHand.IsFirstDeal && BlackjackCheck(cards))
             {
-                value = 21;
                 altValue = null;
+
+                return BlackjackValue;
             }
-            else
+
+            byte value = 0;
+
+            foreach (var card in cards)
             {
-                foreach (var card in cards)
-                {
-                    if (card.Rank == Rank.Ace)
-                        altValue += 11;
-                    else
-                        altValue += CardValues[card];
+                if (card.Rank == Rank.Ace)
+                    altValue += AceAltValue;
+                else
+                    altValue += _cardValues[card];
 
-                    value += CardValues[card];
-                }
-
-                if (altValue > 21 || altValue == value)
-                    altValue = null;
+                value += _cardValues[card];
             }
 
+            if (altValue > BlackjackValue || altValue == value)
+                altValue = null;
+            
             return value;
         }
 
@@ -239,38 +248,40 @@ namespace Game
 
         private void BlackjackCheckInit()
         {
-            // Blackjack check: 
-            // 1. After 1st Deal (Ok)
-            // 2. After Split && 1st Deal in a new Hand (Hit, Ok)
-            if (CurHand.IsFirstDeal)
-            {
-                var handBlackjack = BlackjackCheck(CurHand.HandCards);
-                var houseBlackjack = BlackjackCheck(House.HouseCards);
+            if (!CurHand.IsFirstDeal)
+                return;
 
-                // Ничья
-                if (handBlackjack && houseBlackjack)
-                {
-                    Outcomes.Add("Push just happened! You and House both have blackjack! (+" + CurHand.Bet + "$)");
-                    OutcomeActions.Add(Push);
-                    Endgame?.Invoke(this);
-                }
-                else if (handBlackjack)
-                    BlackJackInit();
-                else if (houseBlackjack)
-                {
-                    Outcomes.Add("House has blackjack!You lose. (- " + CurHand.Bet + "$)");
-                    Endgame?.Invoke(this);
-                }
+            var handBlackjack = BlackjackCheck(CurHand.HandCards);
+            var houseBlackjack = BlackjackCheck(House.HouseCards);
+
+            if (handBlackjack && houseBlackjack)
+            {
+                Outcomes.Add("Push just happened! You and House both have blackjack! (+" + CurHand.Bet + "$)");
+                _outcomeActions.Add(Push);
+                Endgame?.Invoke(this);
+
+                return;
+            }
+
+            if (handBlackjack)
+            {
+                BlackJackInit();
+
+                return;
+            }
+
+            if (houseBlackjack)
+            {
+                Outcomes.Add("House has blackjack!You lose. (- " + CurHand.Bet + "$)");
+                Endgame?.Invoke(this);
             }
         }
 
         private bool BlackjackCheck(List<Card> cards)
         {
-            // Туз + "лицевая" карта => блекджек
-            if (cards.Any(c => c.Rank == Rank.Ace) && cards.Any(c => FaceCards.Contains(c)))
-                return true;
-
-            return false;
+            // Ace + face card == blackjack
+            return cards.Any(c => c.Rank == Rank.Ace) && 
+                cards.Any(c => _faceCards.Contains(c));
         }
 
         public void CheckValues(bool isFinalCheck = false)
@@ -281,7 +292,6 @@ namespace Game
             var houseValue = House.Value;
             var houseAltValue = House.AlternativeValue;
             
-            // Проверка на Bust (после каждой раздачи) 
             BustCheck(handValue, houseValue);
 
             if(isFinalCheck)
@@ -301,16 +311,22 @@ namespace Game
             if (finalHandlValue == finalHouseValue)
             {
                 Outcomes.Add("Push just happened! You have the same value as the house. (+" + CurHand.Bet + "$)");
-                OutcomeActions.Add(Push);
+                _outcomeActions.Add(Push);
                 Endgame?.Invoke(this);
+
+                return;
             }
-            else if (finalHandlValue > finalHouseValue)
+
+            if (finalHandlValue > finalHouseValue)
             {
                 Outcomes.Add("You have more points than the House. You won! (+" + CurHand.Bet * 2 + "$)");
-                OutcomeActions.Add(Win);
+                _outcomeActions.Add(Win);
                 Endgame?.Invoke(this);
+
+                return;
             }
-            else if (finalHandlValue < finalHouseValue)
+
+            if (finalHandlValue < finalHouseValue)
             {
                 Outcomes.Add("House has more points than you. You lose. (-" + CurHand.Bet + "$)");
                 Endgame?.Invoke(this);
@@ -319,21 +335,27 @@ namespace Game
 
         private void BustCheck(byte handValue, byte houseValue)
         {
-            if (handValue > 21 && houseValue > 21)
+            if (handValue > BlackjackValue && houseValue > BlackjackValue)
             {
                 Outcomes.Add("Push just happened! You and House both busted. (+" + CurHand.Bet + "$)");
-                OutcomeActions.Add(Push);
+                _outcomeActions.Add(Push);
                 Endgame?.Invoke(this);
+
+                return;
             }
-            else if (handValue > 21)
+
+            if (handValue > BlackjackValue)
             {
                 Outcomes.Add("Bust just happened! Hand is worth more than 21. (-" + CurHand.Bet + "$)");
                 Endgame?.Invoke(this);
+
+                return;
             }
-            else if (houseValue > 21)
+
+            if (houseValue > BlackjackValue)
             {
                 Outcomes.Add("House has more than 21. You win! (+" + CurHand.Bet * 2 + "$)");
-                OutcomeActions.Add(Win);
+                _outcomeActions.Add(Win);
                 Endgame?.Invoke(this);
             }
         }
@@ -344,59 +366,56 @@ namespace Game
 
         public void Hit()
         {
-            DealUserCards(1);
+            DealUserCards(_cardsToDeal);
 
-            if (CurHand.HandCards.Count == 2)
-                if(BlackjackCheck(CurHand.HandCards))
-                    BlackJackInit();
+            if(CurHand.HandCards.Count == 2 && BlackjackCheck(CurHand.HandCards))
+                BlackJackInit();
         }
 
         public void Stand()
         {
-            // Раздаём по 1 карте для House до тех пор, пока House Value\Alt. Value не достигнет 17
-            while (House.Value < 17 ||
-                House.AlternativeValue != null && House.AlternativeValue < 17)
-                DealHouseCards(1);
+            while (House.Value < House.DrawTo ||
+                House.AlternativeValue != null && House.AlternativeValue < House.DrawTo)
+                DealHouseCards(_cardsToDeal);
         }
 
         public void DoubleDown()
         {
-            if (CurHand.IsDoubleDownAvailable)
-            {
-                // Удваиваем ставку
-                Money -= CurHand.Bet;
-                CurHand.Bet *= 2;
-
-                // Получаем ещё одну карту
-                DealUserCards(1);
-
-                // Обеспечиваем условие последней взятой карты
-                if (!CurHand.IsHandOut)
-                    Stand();
-            }
-            else
+            if (!CurHand.IsDoubleDownAvailable)
                 throw new InvalidOperationException(
                     "Not all conditions satisfy Double Down availability.");
+
+            // Double a bet
+            Money -= CurHand.Bet;
+            CurHand.Bet *= 2;
+
+            // Get another card
+            DealUserCards(_cardsToDeal);
+
+            // Make sure that card user just got is the last one until the end of the round
+            if (!CurHand.IsHandOut)
+                Stand();
         }
 
         public void Split()
         {
-            if (CurHand.IsSplitAvailable)
-            {
-                Money -= CurHand.Bet;
-                
-                var hand = new Hand();
-                hand.HandCards.Add(CurHand.HandCards.Last());
-                hand.Bet = CurHand.Bet;
-                Hands.Add(hand);
-
-                CurHand.HandCards.RemoveAt(1);
-
-                CalculateHandValues();
-            }
-            else
+            if (!CurHand.IsSplitAvailable)
                 throw new InvalidOperationException(
                     "Not all conditions satisfy Split availability.");
+
+            // Substruct money required for a new hand
+            Money -= CurHand.Bet;
+            
+            // Create a new hand and add money to it
+            var hand = new Hand();
+            hand.HandCards.Add(CurHand.HandCards.Last());
+            hand.Bet = CurHand.Bet;
+            Hands.Add(hand);
+
+            // Remove the last (index 1) card from current hand
+            CurHand.HandCards.RemoveAt(1);
+
+            CalculateHandValues();
         }
 
         #endregion
@@ -407,9 +426,9 @@ namespace Game
 
         private void Win() => Money += CurHand.Bet * 2;
 
-        // 3 to 2
         private void BlackJackInit()
         {
+            // 3 to 2
             var gain = CurHand.Bet * 2.5m;
             Money += gain;
             CurHand.Bet = 0;
@@ -420,7 +439,7 @@ namespace Game
 
         public void ExecOutcomeActions()
         {
-            foreach (var action in OutcomeActions)
+            foreach (var action in _outcomeActions)
                 action.Invoke();
         }
 

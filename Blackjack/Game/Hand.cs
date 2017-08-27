@@ -1,17 +1,16 @@
-﻿using Blackjack.Deck;
+﻿using Blackjack.Cards;
 using System.Collections.Generic;
 
-namespace Game
+namespace Blackjack.Game
 {
     public class Hand
     {
-        // Карты на руках у игрока
         public List<Card> HandCards { get; private set; }
 
-        // Сколько очков набрано
+        // How many points user have for current hands
         public byte Value { get; set; }
 
-        // На случай тузов
+        // In case of Aces
         public byte? AlternativeValue { get; set; }
 
         public bool IsDoubleDownAvailable { get; set; }
@@ -22,7 +21,7 @@ namespace Game
 
         public bool IsHandOut { get; set; }
 
-        // Ставка в текущем раунде
+        // Current round bet
         public decimal Bet { get; set; }
 
         public Hand()

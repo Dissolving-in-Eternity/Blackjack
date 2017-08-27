@@ -42,16 +42,18 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Game\Blackjack.cs" />
+    <Compile Include="Game\ConsoleHelper.cs" />
     <Compile Include="Game\GameHandler.cs" />
-    <Compile Include="Deck\Card.cs" />
-    <Compile Include="Deck\Deck.cs" />
+    <Compile Include="Game\Blackjack.cs" />
+    <Compile Include="Game\RoundHandler.cs" />
+    <Compile Include="Cards\Card.cs" />
+    <Compile Include="Cards\Deck.cs" />
     <Compile Include="Game\Hand.cs" />
     <Compile Include="Game\House.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Deck\Rank.cs" />
-    <Compile Include="Deck\Suit.cs" />
+    <Compile Include="Cards\Rank.cs" />
+    <Compile Include="Cards\Suit.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
